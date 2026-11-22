@@ -13,12 +13,16 @@ import {
   legendLines,
   logShare,
   attachVolumes,
+  armyCount,
   customMarket,
+  depthBands,
   describeCoin,
   fallbackMarkets,
   filterMarkets,
   marketsFromExchangeInfo,
   marketsFromTickers,
+  scaledFireRules,
+  wallStrength,
   parseCoin,
   sharePair,
   shouldSampleDust,
@@ -72,6 +76,14 @@ test("perpetual universe keeps USDT perps and can be searched", () => {
   assert.equal(filterMarkets(fallback, "sol").some((market) => market.id === "sol"), true);
   assert.equal(customMarket("sol", fallback), null);
   assert.equal(customMarket("notalist", fallback).symbol, "NOTALISTUSDT");
+  assert.equal(fallback.some((market) => market.symbol === "TSLAUSDT" && market.equity), true);
+  assert.equal(fallback.some((market) => market.symbol === "BTCUSDT" && market.equity), false);
+  const tagged = marketsFromExchangeInfo({
+    symbols: [
+      { symbol: "NVDAUSDT", baseAsset: "NVDA", quoteAsset: "USDT", contractType: "PERPETUAL", status: "TRADING", underlyingSubType: ["TradFi"] },
+    ],
+  });
+  assert.equal(tagged[0].equity, true);
   assert.equal(customMarket("??", fallback), null);
 });
 
@@ -301,6 +313,30 @@ test("legend and link copy stay tied to the rules", () => {
   assert.equal(describeLink({ market: "open", msSinceTrade: 1000, rest: "fail" }).code, "degraded");
   assert.equal(describeLink({ market: "connecting", rest: "fail", failCount: 2 }).code, "blocked");
   assert.equal(describeLink({ market: "down", rest: "ok", failCount: 3 }).code, "snapshot");
+});
+
+test("walls follow depth and armies follow energy", () => {
+  const book = depthBands(
+    [["100", "10"], ["99.2", "10"], ["98", "10"]],
+    [["100.2", "2"], ["101", "2"]],
+  );
+  assert.ok(book.mid > 100 && book.mid < 100.2);
+  assert.ok(book.bid.one > book.ask.one);
+  assert.ok(book.bid.half > 0);
+  assert.ok(wallStrength(book.bid.one, book.ask.one).bid > wallStrength(book.bid.one, book.ask.one).ask);
+  assert.equal(armyCount(0, 0), 3);
+  assert.ok(armyCount(9_000_000, 1_000_000) > armyCount(1_000_000, 9_000_000));
+});
+
+test("stock fire tiers scale and crypto majors stay fixed", () => {
+  const crypto = scaledFireRules(20_000_000_000, false);
+  assert.equal(crypto.scaled, false);
+  assert.equal(crypto.bombUsd, 250_000);
+  const thin = scaledFireRules(5_000_000, true);
+  assert.equal(thin.scaled, true);
+  assert.ok(thin.bombUsd < 250_000);
+  assert.ok(thin.airdropUsd > thin.bombUsd);
+  assert.equal(thin.overrides.victoryHoldMs, undefined);
 });
 
 test("dust sampling never promotes a full shot", () => {

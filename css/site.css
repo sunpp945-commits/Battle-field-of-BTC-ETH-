@@ -303,6 +303,19 @@ button:focus-visible, a:focus-visible {
 .sub.is-up { color: var(--up); }
 .sub.is-down { color: var(--down); }
 
+.intel {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.coin-group {
+  padding: 10px 4px 4px;
+  color: var(--gold);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+
 .energy {
   margin-top: 10px;
   padding: 12px;
@@ -500,7 +513,8 @@ body:not(.is-reduced) .victory {
   }
   .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .field { height: 560px; }
-  .split { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); }
+  .intel { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .split { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {

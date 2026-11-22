@@ -22,6 +22,30 @@ export const RULES = Object.freeze({
   dustRate: 0.72,
 });
 
+export const STOCK_BASES = Object.freeze([
+  "TSLA", "AAPL", "NVDA", "AMZN", "META", "MSFT", "GOOGL", "GOOG", "AMD", "AVGO",
+  "COIN", "MSTR", "PLTR", "NFLX", "BABA", "INTC", "ARM", "SMCI", "HOOD", "MU",
+  "CRM", "ORCL", "UBER", "PYPL", "NIO", "BIDU", "JD", "PDD", "QQQ", "SPY",
+  "IWM", "DIA", "GLD", "TQQQ", "SOXL", "ASML", "SHOP", "SQ", "BA", "DIS",
+]);
+
+const STOCK_SET = new Set(STOCK_BASES);
+
+export function isStockId(id) {
+  return STOCK_SET.has(String(id || "").toUpperCase());
+}
+
+export function isEquityContract(row) {
+  if (!row) return false;
+  const bits = []
+    .concat(row.underlyingType || [])
+    .concat(row.underlyingSubType || [])
+    .concat(row.contractType || []);
+  const text = bits.join(" ").toLowerCase();
+  if (/tradfi|equity|stock|etf/.test(text)) return true;
+  return isStockId(row.baseAsset || row.symbol);
+}
+
 export const FALLBACK_SYMBOLS = Object.freeze([
   "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", "ADAUSDT",
   "AVAXUSDT", "LINKUSDT", "DOTUSDT", "LTCUSDT", "BCHUSDT", "TRXUSDT", "TONUSDT",
@@ -43,7 +67,8 @@ export const FALLBACK_SYMBOLS = Object.freeze([
   "CELOUSDT", "FLOWUSDT", "KSMUSDT", "ZILUSDT", "ONEUSDT", "QTUMUSDT", "ICXUSDT",
   "ONTUSDT", "IOSTUSDT", "BANDUSDT", "STORJUSDT", "KNCUSDT", "RSRUSDT", "OCEANUSDT",
   "CTSIUSDT", "ALICEUSDT", "TLMUSDT", "LITUSDT", "UNFIUSDT", "REEFUSDT", "DODOUSDT",
-  "LINAUSDT", "AUDIOUSDT",   "CELRUSDT", "C98USDT",
+  "LINAUSDT", "AUDIOUSDT", "CELRUSDT", "C98USDT",
+  ...STOCK_BASES.map((base) => `${base}USDT`),
 ]);
 
 export function normalizeCoinId(value) {
@@ -73,7 +98,13 @@ export function fallbackMarkets() {
     const id = normalizeCoinId(symbol);
     if (!id || seen.has(id)) continue;
     seen.add(id);
-    markets.push({ id, symbol: `${id.toUpperCase()}USDT`, label: id.toUpperCase(), quoteVolume: 0 });
+    markets.push({
+      id,
+      symbol: `${id.toUpperCase()}USDT`,
+      label: id.toUpperCase(),
+      quoteVolume: 0,
+      equity: isStockId(id),
+    });
   }
   return markets;
 }
@@ -88,7 +119,8 @@ export function marketsFromExchangeInfo(info) {
     if (!symbol.endsWith("USDT") || symbol.includes("_")) continue;
     const id = normalizeCoinId(row.baseAsset || symbol);
     if (!id) continue;
-    markets.push({ id, symbol: `${id.toUpperCase()}USDT`, label: id.toUpperCase(), quoteVolume: 0 });
+    const equity = isEquityContract(row);
+    markets.push({ id, symbol: `${id.toUpperCase()}USDT`, label: id.toUpperCase(), quoteVolume: 0, equity });
   }
   return markets;
 }
@@ -108,6 +140,7 @@ export function marketsFromTickers(tickers) {
       symbol: `${id.toUpperCase()}USDT`,
       label: id.toUpperCase(),
       quoteVolume: Number(row.quoteVolume) || 0,
+      equity: isStockId(id),
     });
   }
   return markets;
@@ -135,7 +168,85 @@ export function customMarket(query, markets) {
   const id = normalizeCoinId(query);
   if (!id) return null;
   if (markets.some((market) => market.id === id)) return null;
-  return { id, symbol: `${id.toUpperCase()}USDT`, label: id.toUpperCase(), quoteVolume: 0, custom: true };
+  const equity = isStockId(id);
+  return { id, symbol: `${id.toUpperCase()}USDT`, label: id.toUpperCase(), quoteVolume: 0, equity, custom: true };
+}
+
+export function depthBands(bids, asks) {
+  const bestBid = Number(bids?.[0]?.[0]);
+  const bestAsk = Number(asks?.[0]?.[0]);
+  if (!(bestBid > 0) || !(bestAsk > 0)) return null;
+  const mid = (bestBid + bestAsk) / 2;
+  const band = (levels) => {
+    let half = 0;
+    let one = 0;
+    for (const level of levels || []) {
+      const price = Number(level?.[0]);
+      const qty = Number(level?.[1]);
+      if (!(price > 0) || !(qty > 0)) continue;
+      const dist = Math.abs(price - mid) / mid;
+      const usd = price * qty;
+      if (dist <= 0.005) half += usd;
+      if (dist <= 0.01) one += usd;
+    }
+    return { half, one };
+  };
+  return { mid, bid: band(bids), ask: band(asks) };
+}
+
+export function wallStrength(bidUsd, askUsd) {
+  const bid = bidUsd > 0 ? bidUsd : 0;
+  const ask = askUsd > 0 ? askUsd : 0;
+  const max = Math.max(bid, ask, 1);
+  const unit = (value) => (value > 0 ? 0.28 + 0.72 * Math.sqrt(value / max) : 0.12);
+  return { bid: unit(bid), ask: unit(ask) };
+}
+
+export function armyCount(usd, peerUsd) {
+  const mine = usd > 0 ? usd : 0;
+  const peer = peerUsd > 0 ? peerUsd : 0;
+  if (mine <= 0 && peer <= 0) return 3;
+  const top = Math.max(mine, peer, 1);
+  return 3 + Math.round(Math.sqrt(Math.min(1, mine / top)) * 13);
+}
+
+export function scaledFireRules(quoteVolume, equity) {
+  if (!equity) {
+    return {
+      equity: false,
+      scaled: false,
+      scale: 1,
+      overrides: {},
+      bombUsd: RULES.bombUsd,
+      airdropUsd: RULES.airdropUsd,
+      shotMinUsd: RULES.shotMinUsd,
+    };
+  }
+  const vol = Number(quoteVolume);
+  const known = vol > 0;
+  const scale = known ? Math.min(1, Math.max(0.004, vol / 500_000_000)) : 0.02;
+  const cut = (n) => Math.max(80, Math.round((n * scale) / 10) * 10);
+  const bombUsd = cut(RULES.bombUsd);
+  const airdropUsd = Math.max(bombUsd + 10, cut(RULES.airdropUsd));
+  return {
+    equity: true,
+    scaled: true,
+    scale,
+    known,
+    overrides: {
+      shotMinUsd: cut(RULES.shotMinUsd),
+      volleyUsd: cut(RULES.volleyUsd),
+      bombUsd,
+      airdropUsd,
+      bombSpikeUsd: cut(RULES.bombSpikeUsd),
+      airdropSurgeUsd: Math.max(airdropUsd, cut(RULES.airdropSurgeUsd)),
+      advantageMinTotalUsd: cut(RULES.advantageMinTotalUsd),
+      dustUsd: Math.max(20, Math.round(cut(RULES.dustUsd))),
+    },
+    bombUsd,
+    airdropUsd,
+    shotMinUsd: cut(RULES.shotMinUsd),
+  };
 }
 
 export function usdNotional(price, qty) {
@@ -346,7 +457,7 @@ export function legendLines(rules = RULES) {
   return [
     {
       title: "两边各是谁",
-      text: "左侧绿色多军是主动买入（做多）。右侧红色空军是主动卖出（做空）。两边各有营地，中间是被撕开的战线。",
+      text: "左侧绿色多军是主动买入。人数随近 60 秒买入量能增减。城墙厚度是买盘挂单。右侧红色空军是主动卖出，人数和城墙同理。",
     },
     {
       title: "量能",
@@ -506,6 +617,8 @@ function createSideWindow(windowMs) {
 export function createBattleEnergy(overrides = {}) {
   const rules = { ...RULES, ...overrides };
   const window = createSideWindow(rules.windowMs);
+  const flow10 = createSideWindow(10_000);
+  const flow300 = createSideWindow(300_000);
   const spikes = { buy: createBucket(rules.bombSpikeMs), sell: createBucket(rules.bombSpikeMs) };
   const surges = {
     buy: createBucket(rules.airdropSurgeMs),
@@ -528,6 +641,11 @@ export function createBattleEnergy(overrides = {}) {
       lockedSide,
       lastVictorySide: lastVictory ? lastVictory.side : null,
       lastVictoryAt: lastVictory ? lastVictory.at : null,
+      flow: {
+        s10: flow10.totals(now),
+        m1: totals,
+        m5: flow300.totals(now),
+      },
     };
   }
 
@@ -589,6 +707,8 @@ export function createBattleEnergy(overrides = {}) {
     spike.add(now, usd);
     surge.add(now, usd);
     window.add(now, side, usd);
+    flow10.add(now, side, usd);
+    flow300.add(now, side, usd);
     applyLead(now, events);
     return { events, state: snapshot(now) };
   }
@@ -601,6 +721,8 @@ export function createBattleEnergy(overrides = {}) {
 
   function reset() {
     window.clear();
+    flow10.clear();
+    flow300.clear();
     spikes.buy.clear();
     spikes.sell.clear();
     surges.buy.clear();
@@ -615,5 +737,10 @@ export function createBattleEnergy(overrides = {}) {
     lastSurge.sell = Number.NEGATIVE_INFINITY;
   }
 
-  return { push, tick, snapshot, reset, rules };
+  function setRules(next) {
+    for (const key of Object.keys(rules)) delete rules[key];
+    Object.assign(rules, RULES, next || {});
+  }
+
+  return { push, tick, snapshot, reset, setRules, rules };
 }

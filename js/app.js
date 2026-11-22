@@ -4,7 +4,9 @@ import {
   barCaption,
   basisRate,
   createBattleEnergy,
+  armyCount,
   customMarket,
+  depthBands,
   describeCoin,
   describeLink,
   eventTitle,
@@ -18,14 +20,17 @@ import {
   formatQty,
   formatSignedPct,
   legendLines,
+  isStockId,
   parseCoin,
+  scaledFireRules,
   shouldSampleDust,
   streakCopy,
   sumNotional,
   usdNotional,
+  wallStrength,
 } from "./math.js";
 import { createFeed, fetchMarketList, fetchSnapshot } from "./binance.js";
-import { mountField } from "./field.js?v=2";
+import { mountField } from "./field.js?v=4";
 
 const $ = (id) => document.getElementById(id);
 
@@ -42,6 +47,8 @@ try {
 let coinId = parseCoin(location.search);
 let markets = fallbackMarkets();
 let marketNote = "正在读取币安永续列表…";
+let quoteVolume = 0;
+let equityMode = false;
 let latestMark = NaN;
 let restGen = 0;
 let feed = null;
@@ -89,6 +96,14 @@ const els = {
   sums: $("energy-sums"),
   note: $("energy-note"),
   book: $("book-line"),
+  flow10: $("flow-10"),
+  flow60: $("flow-60"),
+  flow300: $("flow-300"),
+  wallMid: $("wall-mid"),
+  wallBid: $("wall-bid"),
+  wallAsk: $("wall-ask"),
+  contractNote: $("contract-note"),
+  tierNote: $("tier-note"),
   victory: $("victory"),
   victoryKicker: $("victory-kicker"),
   victorySub: $("victory-sub"),
@@ -158,9 +173,17 @@ function selectCoin(nextId, options = {}) {
   if (historyMode === "push") history.pushState({}, "", url);
   else if (historyMode === "replace") history.replaceState({}, "", url);
 
+  const picked = markets.find((item) => item.id === coin.id);
+  equityMode = Boolean(picked?.equity || isStockId(coin.id));
+  quoteVolume = Number(picked?.quoteVolume) || 0;
+  applyFireRules();
   els.symbol.textContent = `${coin.symbol} 永续`;
   els.coinOpen.textContent = `${coin.label} 永续`;
   document.title = `藤骨战线 · ${coin.label} 永续`;
+  els.contractNote.hidden = !equityMode;
+  els.contractNote.textContent = equityMode
+    ? `${coin.symbol} 是币安 USDT 本位永续，跟踪这只股票或 ETF，不是股票份额，也不是 bStocks 现货代币。`
+    : "";
   if (!els.coinDialog.hidden) renderCoinList();
 
   energy.reset();
@@ -232,37 +255,65 @@ function closePicker() {
 }
 
 function renderCoinList() {
-  const query = els.coinSearch.value;
+  const query = els.coinSearch.value.trim();
   const shown = filterMarkets(markets, query);
   const extra = customMarket(query, markets);
   els.coinSource.textContent = marketNote;
   els.coinList.replaceChildren();
-  const rows = extra ? [extra, ...shown] : shown;
-  if (!rows.length) {
+  if (!shown.length && !extra) {
     const empty = document.createElement("li");
     empty.className = "coin-empty";
-    empty.textContent = "没有匹配的合约。输入如 SOL 或 DOGEUSDT 也可以直接切换。";
+    empty.textContent = "没有匹配的合约。可以输入 TSLAUSDT 这类名字直接切换。";
     els.coinList.append(empty);
     return;
   }
-  for (const market of rows) {
-    const item = document.createElement("li");
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = market.id === coinId ? "is-on" : "";
-    button.setAttribute("aria-pressed", market.id === coinId ? "true" : "false");
-    const name = document.createElement("span");
-    name.textContent = market.custom ? `使用 ${market.symbol}` : market.symbol;
-    const meta = document.createElement("span");
-    meta.textContent = market.quoteVolume > 0 ? formatCompactUsd(market.quoteVolume) : market.custom ? "手输" : "";
-    button.append(name, meta);
-    button.addEventListener("click", () => {
-      closePicker();
-      selectCoin(market.id);
-    });
-    item.append(button);
-    els.coinList.append(item);
+  if (extra) appendCoinRow(extra);
+  if (!query) {
+    appendGroup("加密货币", shown.filter((market) => !market.equity));
+    appendGroup("股票/ETF 永续", shown.filter((market) => market.equity));
+    return;
   }
+  for (const market of shown) appendCoinRow(market);
+}
+
+function appendGroup(title, rows) {
+  if (!rows.length) return;
+  const head = document.createElement("li");
+  head.className = "coin-group";
+  head.textContent = title;
+  els.coinList.append(head);
+  for (const market of rows) appendCoinRow(market);
+}
+
+function appendCoinRow(market) {
+  const item = document.createElement("li");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = market.id === coinId ? "is-on" : "";
+  button.setAttribute("aria-pressed", market.id === coinId ? "true" : "false");
+  const name = document.createElement("span");
+  const tag = market.equity ? "股票" : "加密";
+  name.textContent = market.custom ? `使用 ${market.symbol}` : `${market.symbol} · ${tag}`;
+  const meta = document.createElement("span");
+  meta.textContent = market.quoteVolume > 0 ? formatCompactUsd(market.quoteVolume) : market.custom ? "手输" : "";
+  button.append(name, meta);
+  button.addEventListener("click", () => {
+    closePicker();
+    selectCoin(market.id);
+  });
+  item.append(button);
+  els.coinList.append(item);
+}
+
+function applyFireRules() {
+  const fire = scaledFireRules(quoteVolume, equityMode);
+  energy.setRules(fire.overrides);
+  if (!equityMode) {
+    els.tierNote.textContent = "加密货币用固定分档：炮弹 1.5万，炸弹 25万，空投 100万。占优仍是 58%、合计至少 50万、满 20 秒。";
+    return;
+  }
+  const known = quoteVolume > 0 ? `按 24 小时成交额 ${formatCompactUsd(quoteVolume)} 缩小` : "24 小时成交额还没到，先用较小分档";
+  els.tierNote.textContent = `股票/ETF 永续的炮弹、炸弹、空投已${known}。当前炸弹约 ${formatCompactUsd(fire.bombUsd)}，空投约 ${formatCompactUsd(fire.airdropUsd)}。这不是 BTC 的 25万 / 100万。占优比例仍是 58%，满 20 秒。`;
 }
 
 async function loadMarkets() {
@@ -270,7 +321,8 @@ async function loadMarkets() {
     const result = await fetchMarketList();
     if (!result.live) throw new Error("empty");
     markets = result.markets;
-    marketNote = `币安合约列表 · ${markets.length} 个 USDT 永续，按 24 小时成交额排序。`;
+    const stocks = markets.filter((item) => item.equity).length;
+    marketNote = `币安合约列表 · 加密 ${markets.length - stocks} · 股票/ETF ${stocks}，按 24 小时成交额排序。`;
   } catch {
     markets = fallbackMarkets();
     marketNote = "连不上 fapi.binance.com（常见是 451 或网络限制）。下面是内置常用永续，也可以直接输入合约名。";
@@ -381,6 +433,20 @@ function paintEnergy(state) {
   els.energy.classList.toggle("is-sell", state.leader === "sell");
   els.energy.classList.toggle("is-even", !state.leader);
   field.setShare(has ? state.buy : 0.5);
+  if (state.flow) {
+    setText(els.flow10, flowLine("10 秒", state.flow.s10));
+    setText(els.flow60, flowLine("1 分", state.flow.m1));
+    setText(els.flow300, flowLine("5 分", state.flow.m5));
+  }
+  field.setArmy({
+    buy: armyCount(state.buyUsd, state.sellUsd),
+    sell: armyCount(state.sellUsd, state.buyUsd),
+  });
+}
+
+function flowLine(label, pair) {
+  if (!pair) return `${label} —`;
+  return `${label}  多军 ${formatCompactUsd(pair.buyUsd)} · 空军 ${formatCompactUsd(pair.sellUsd)}`;
 }
 
 function paintLink() {
@@ -410,7 +476,13 @@ function paintTicker(percent, quote, last) {
     els.chg.className = pct > 0 ? "sub is-up" : pct < 0 ? "sub is-down" : "sub";
   }
   const vol = Number(quote);
-  if (Number.isFinite(vol) && vol > 0) els.vol.textContent = `24 小时成交额 ${formatCompactUsd(vol)}`;
+  if (Number.isFinite(vol) && vol > 0) {
+    els.vol.textContent = `24 小时成交额 ${formatCompactUsd(vol)}`;
+    if (equityMode && vol !== quoteVolume) {
+      quoteVolume = vol;
+      applyFireRules();
+    }
+  }
   if (!lastTradeAt && last != null) setText(els.last, formatPrice(last));
 }
 
@@ -422,13 +494,20 @@ function paintOi(qty, mark) {
 }
 
 function paintBook(bids, asks) {
-  const bid = sumNotional(bids);
-  const ask = sumNotional(asks);
-  if (bid + ask <= 0) {
+  const bands = depthBands(bids, asks);
+  if (!bands) {
     els.book.textContent = "盘口还没有到";
+    setText(els.wallMid, "中间价 —");
+    setText(els.wallBid, "多军城墙 —");
+    setText(els.wallAsk, "空军城墙 —");
     return;
   }
-  els.book.textContent = `买盘 ${formatCompactUsd(bid)} · 卖盘 ${formatCompactUsd(ask)} · 可见盘口，不计入胜负`;
+  const walls = wallStrength(bands.bid.one, bands.ask.one);
+  field.setWalls(walls);
+  setText(els.wallMid, `中间价 ${formatPrice(bands.mid)}`);
+  setText(els.wallBid, `多军 ±0.5% ${formatCompactUsd(bands.bid.half)} · ±1% ${formatCompactUsd(bands.bid.one)}`);
+  setText(els.wallAsk, `空军 ±0.5% ${formatCompactUsd(bands.ask.half)} · ±1% ${formatCompactUsd(bands.ask.one)}`);
+  els.book.textContent = "城墙按距中间价 1% 内的挂单名义金额变厚，不触发炸弹或大获全胜。";
 }
 
 function showVictory(side) {

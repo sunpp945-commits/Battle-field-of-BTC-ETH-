@@ -35,7 +35,9 @@
       <p id="status-detail" class="status-detail">正在连接 fstream.binance.com 的 /market 与 /public 线路。</p>
     </header>
 
-    <p class="mapping">左侧绿色多军是主动买入。右侧红色空军是主动卖出。这条战线没有声音。</p>
+    <p class="mapping">左侧绿色多军是主动买入。右侧红色空军是主动卖出。城墙是挂单，人数是量能。没有声音。</p>
+    <p id="contract-note" class="mapping" hidden></p>
+    <p id="tier-note" class="note"></p>
 
     <section class="metrics" aria-label="行情">
       <article class="card">
@@ -87,6 +89,29 @@
       <p id="book-line" class="book-line">盘口还没有到</p>
     </section>
 
+    <section class="intel" aria-label="盘口和吃单">
+      <article class="panel">
+        <h2>吃单</h2>
+        <p id="flow-10" class="sub">10 秒 —</p>
+        <p id="flow-60" class="sub">1 分 —</p>
+        <p id="flow-300" class="sub">5 分 —</p>
+        <p class="sub">主动买入对主动卖出的名义金额，由本页计算。</p>
+      </article>
+      <article class="panel">
+        <h2>挂单 / 城墙</h2>
+        <p id="wall-mid" class="sub">中间价 —</p>
+        <p id="wall-bid" class="sub">多军城墙 —</p>
+        <p id="wall-ask" class="sub">空军城墙 —</p>
+        <p class="sub">可见档位里，距中间价 0.5% 和 1% 以内的挂单。</p>
+      </article>
+      <article class="panel" aria-label="大单战报">
+        <h2>大单战报</h2>
+        <ol id="tape" class="tape">
+          <li class="empty">齐射以上的成交、炸弹、空投和强平会列在这里。</li>
+        </ol>
+      </article>
+    </section>
+
     <section id="field" class="field" aria-label="战线">
       <canvas id="battle" width="800" height="480">左侧多军代表主动买入，右侧空军代表主动卖出。</canvas>
       <div id="victory" class="victory" hidden role="status">
@@ -99,12 +124,6 @@
     <p id="last-event" class="last-event">最近重击：还没有炸弹、空投或强平</p>
 
     <div class="split">
-      <section class="panel" aria-label="最近重击">
-        <h2>最近重击</h2>
-        <ol id="tape" class="tape">
-          <li class="empty">齐射以上的成交、炸弹、空投和强平会列在这里。</li>
-        </ol>
-      </section>
       <section class="panel" aria-labelledby="rules-title">
         <h2 id="rules-title">规则</h2>
         <div id="chips" class="chips"></div>
@@ -114,7 +133,7 @@
 
     <footer class="foot">
       <p>价格是币安 USDⓈ-M 永续合约，不是现货。多军/空军占优、炸弹、空投支援和大获全胜都由本页按公开成交的主动买卖名义金额计算，不是币安官方指标。</p>
-      <p>全网账户多空比和 5 分钟主动买卖量比另行列出，那两项来自币安公开接口。强平来自 forceOrder。盘口只显示可见深度。</p>
+      <p>全网账户多空比和 5 分钟主动买卖量比另行列出，那两项来自币安公开接口。强平来自 forceOrder。城墙只反映可见挂单。股票或 ETF 名字表示跟踪该标的的 USDT 永续，不是股票份额，也不是 bStocks。</p>
       <p>数据由你的浏览器直接向币安请求。没有账号，没有声音，没有代理。</p>
     </footer>
   </div>
@@ -125,12 +144,12 @@
         <button type="button" id="coin-close">关闭</button>
       </div>
       <label class="coin-label" for="coin-search">搜索</label>
-      <input id="coin-search" type="search" placeholder="BTC、ETH、SOL、DOGEUSDT" autocomplete="off" enterkeyhint="search">
+      <input id="coin-search" type="search" placeholder="BTC、SOL、TSLA、NVDAUSDT" autocomplete="off" enterkeyhint="search">
       <p id="coin-source" class="coin-source">正在读取币安永续列表…</p>
       <ul id="coin-list" class="coin-list"></ul>
     </div>
   </div>
   <noscript>需要启用 JavaScript。页面不会向本站发送数据，只在你的浏览器里连接币安公开行情。</noscript>
-  <script type="module" src="js/app.js?v=2"></script>
+  <script type="module" src="js/app.js?v=4"></script>
 </body>
 </html>

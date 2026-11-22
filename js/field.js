@@ -12,6 +12,8 @@ export function mountField(canvas) {
   let bids = [];
   let asks = [];
   let buyShare = 0.5;
+  let walls = { bid: 0.34, ask: 0.34 };
+  let army = { buy: 8, sell: 8 };
   let reduced = false;
   let width = 0;
   let height = 0;
@@ -64,6 +66,8 @@ export function mountField(canvas) {
       effects,
       celebrate: celebrateSide && now < celebrateUntil ? celebrateSide : null,
       impacts,
+      walls,
+      army,
     };
     const heavy = effects.some((effect) => effect.type === "bomb" || effect.type === "liq" || effect.type === "airdrop");
     const shake = !reduced && (now < shakeUntil || (scene.celebrate && heavy)) ? 5 * scale : 0;
@@ -75,6 +79,7 @@ export function mountField(canvas) {
     drawTracks(ctx, scene);
     drawFort(ctx, scene, "buy");
     drawFort(ctx, scene, "sell");
+    drawWalls(ctx, scene);
     drawFront(ctx, scene);
     drawCrowd(ctx, scene);
     drawEffects(ctx, scene);
@@ -108,6 +113,20 @@ export function mountField(canvas) {
     },
     setShare(share) {
       if (Number.isFinite(share)) buyShare = share;
+    },
+    setWalls(next) {
+      if (!next) return;
+      walls = {
+        bid: clamp(Number(next.bid) || 0.12, 0.12, 1),
+        ask: clamp(Number(next.ask) || 0.12, 0.12, 1),
+      };
+    },
+    setArmy(next) {
+      if (!next) return;
+      army = {
+        buy: clamp(Math.round(Number(next.buy) || 3), 2, 16),
+        sell: clamp(Math.round(Number(next.sell) || 3), 2, 16),
+      };
     },
     setReduced(next) {
       reduced = Boolean(next);
@@ -161,6 +180,8 @@ export function mountField(canvas) {
       bids = [];
       asks = [];
       buyShare = 0.5;
+      walls = { bid: 0.34, ask: 0.34 };
+      army = { buy: 8, sell: 8 };
       celebrateSide = null;
       celebrateUntil = 0;
     },
@@ -339,31 +360,60 @@ function drawFront(ctx, scene) {
   void w;
 }
 
-function drawCrowd(ctx, scene) {
-  const { h, now, reduced, w, scale, front } = scene;
-  const ranks = w < 560 ? 3 : 4;
-  for (let lane = 0; lane < LANES.length; lane += 1) {
-    const foot = h * LANES[lane] + ((lane % 2) - 0.5) * 6;
-    for (const side of ["buy", "sell"]) {
-      for (let rank = 0; rank < ranks; rank += 1) {
-        const kind = rank === ranks - 1 ? "melee" : rank === ranks - 2 ? "archer" : "shield";
-        const surge = scene.celebrate === side ? 34 * scale : 0;
-        const lunge = reduced ? 0 : Math.max(0, Math.sin(now / 260 + lane * 1.7 + rank)) * (kind === "melee" ? 16 : 6) * scale;
-        const dir = side === "buy" ? 1 : -1;
-        const x = clashX(scene, side, rank, ranks) + dir * (lunge + surge);
-        const pose = poseFor(scene, side, lane, kind, rank === ranks - 1 ? 2 : rank) || (kind === "melee" && !reduced && Math.sin(now / 260 + lane) > 0.15 ? "aim" : "idle");
-        drawPerson(ctx, x, foot, {
-          side,
-          kind,
-          scale: scale * (kind === "melee" ? 1.05 : 0.88),
-          phase: now / 140 + lane + rank,
-          pose,
-          reduced,
-        });
-      }
+function drawWalls(ctx, scene) {
+  const { w, h, scale } = scene;
+  const bid = scene.walls?.bid ?? 0.34;
+  const ask = scene.walls?.ask ?? 0.34;
+  drawCourse(w * 0.125, bid, true);
+  drawCourse(w * 0.875, ask, false);
+  function drawCourse(anchor, strength, buy) {
+    const thick = (18 + strength * 62) * scale;
+    const top = h * 0.4;
+    const courses = 8;
+    const step = (h * 0.46) / courses;
+    for (let i = 0; i < courses; i += 1) {
+      ctx.fillStyle = buy ? (i % 2 ? "#245c38" : "#3f8f55") : (i % 2 ? "#6e2a24" : "#b44838");
+      const inset = (i % 2) * 5 * scale;
+      const x = buy ? anchor : anchor - thick + inset;
+      ctx.fillRect(x, top + i * step, Math.max(8, thick - inset), step - 2);
+      ctx.strokeStyle = "rgba(0,0,0,0.4)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, top + i * step, Math.max(8, thick - inset), step - 2);
     }
   }
-  void front;
+}
+
+function drawCrowd(ctx, scene) {
+  const { h, now, reduced, scale } = scene;
+  const lanes = LANES.length;
+  for (const side of ["buy", "sell"]) {
+    const count = side === "buy" ? scene.army?.buy ?? 8 : scene.army?.sell ?? 8;
+    const slots = [];
+    for (let i = 0; i < count; i += 1) {
+      const lane = i % lanes;
+      const rank = Math.floor(i / lanes);
+      slots.push({ lane, rank });
+    }
+    const maxRank = slots.reduce((m, slot) => Math.max(m, slot.rank), 0);
+    for (const slot of slots) {
+      const frontRank = slot.rank === maxRank;
+      const kind = frontRank ? "melee" : slot.rank === maxRank - 1 ? "archer" : "shield";
+      const foot = h * LANES[slot.lane] + ((slot.lane % 2) - 0.5) * 5;
+      const surge = scene.celebrate === side ? 36 * scale : 0;
+      const lunge = reduced ? 0 : Math.max(0, Math.sin(now / 240 + slot.lane + slot.rank)) * (kind === "melee" ? 18 : 7) * scale;
+      const dir = side === "buy" ? 1 : -1;
+      const poseBase = poseFor(scene, side, slot.lane, kind, frontRank ? 2 : slot.rank);
+      const pose = poseBase === "idle" && kind === "melee" && !reduced && Math.sin(now / 240 + slot.lane) > 0.05 ? "aim" : poseBase;
+      drawPerson(ctx, clashX(scene, side, slot.rank, maxRank + 1) + dir * (lunge + surge), foot, {
+        side,
+        kind,
+        scale: scale * (kind === "melee" ? 1.02 : 0.86),
+        phase: now / 130 + slot.lane + slot.rank,
+        pose,
+        reduced,
+      });
+    }
+  }
 }
 
 function clashX(scene, side, rank, ranks) {
