@@ -18,8 +18,8 @@ export const RULES = Object.freeze({
   airdropSurgeMs: 5_000,
   airdropSurgeUsd: 1_500_000,
   airdropSurgeCooldownMs: 10_000,
-  dustUsd: 2_000,
-  dustRate: 0.12,
+  dustUsd: 800,
+  dustRate: 0.72,
 });
 
 export const FALLBACK_SYMBOLS = Object.freeze([

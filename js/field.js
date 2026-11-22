@@ -6,7 +6,9 @@ const LANES = [0.4, 0.52, 0.64, 0.76];
 export function mountField(canvas) {
   const ctx = canvas.getContext("2d");
   const effects = [];
+  const impacts = [];
   let confetti = [];
+  let shakeUntil = 0;
   let bids = [];
   let asks = [];
   let buyShare = 0.5;
@@ -61,8 +63,13 @@ export function mountField(canvas) {
       reduced,
       effects,
       celebrate: celebrateSide && now < celebrateUntil ? celebrateSide : null,
+      impacts,
     };
-    ctx.clearRect(0, 0, w, h);
+    const heavy = effects.some((effect) => effect.type === "bomb" || effect.type === "liq" || effect.type === "airdrop");
+    const shake = !reduced && (now < shakeUntil || (scene.celebrate && heavy)) ? 5 * scale : 0;
+    ctx.save();
+    if (shake) ctx.translate((Math.random() - 0.5) * shake * 2, (Math.random() - 0.5) * shake * 2);
+    ctx.clearRect(-20, -20, w + 40, h + 40);
     drawBackdrop(ctx, scene);
     drawDepthWash(ctx, scene, bids, asks);
     drawTracks(ctx, scene);
@@ -72,16 +79,25 @@ export function mountField(canvas) {
     drawCrowd(ctx, scene);
     drawEffects(ctx, scene);
     if (!reduced) drawConfetti(ctx, scene, confetti);
-    if (scene.celebrate && !reduced) {
-      ctx.save();
+    if (scene.celebrate) {
       const left = Math.max(0, (celebrateUntil - now) / 6000);
-      ctx.globalAlpha = 0.12 * left;
-      ctx.fillStyle = scene.celebrate === "buy" ? "#b6ffd8" : "#ffc2ae";
-      ctx.fillRect(0, 0, w, h);
+      ctx.save();
+      ctx.globalAlpha = (reduced ? 0.12 : 0.28) * left;
+      ctx.fillStyle = scene.celebrate === "buy" ? "#d6ff8a" : "#ffb088";
+      ctx.fillRect(0, h * 0.34, w, h);
+      if (!reduced) {
+        ctx.globalAlpha = 0.55 * left;
+        ctx.strokeStyle = scene.celebrate === "buy" ? "#f4ffb0" : "#ffe0c8";
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(front, h * 0.62, (1 - left) * w * 0.45, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.restore();
     } else if (now >= celebrateUntil) {
       celebrateSide = null;
     }
+    ctx.restore();
     drawCaptions(ctx, w);
   }
 
@@ -98,34 +114,50 @@ export function mountField(canvas) {
       if (reduced) confetti = [];
     },
     spawn(event) {
+      const born = performance.now();
       const life =
-        event.type === "airdrop" ? 1800 : event.type === "bomb" ? 1500 : event.type === "liq" ? 1600 : event.tier === "volley" ? 1200 : 980;
-      effects.push({
-        ...event,
-        born: performance.now(),
-        life,
-        lane: 0.16 + Math.random() * 0.68,
-      });
-      if (effects.length > 80) effects.splice(0, effects.length - 80);
+        event.type === "airdrop" ? 1900 : event.type === "bomb" ? 1700 : event.type === "liq" ? 1600 : event.tier === "volley" ? 900 : 640;
+      const lane = 0.12 + Math.random() * 0.76;
+      effects.push({ ...event, born, life, lane });
+      if (event.type === "bomb" || event.type === "liq" || event.type === "airdrop") {
+        if (!reduced) shakeUntil = born + (event.type === "bomb" ? 520 : 280);
+      } else {
+        impacts.push({
+          side: event.side === "buy" ? "sell" : "buy",
+          lane,
+          born,
+          life: 520,
+        });
+      }
+      const shotCount = effects.reduce((n, item) => n + (item.type === "bomb" || item.type === "airdrop" || item.type === "liq" ? 0 : 1), 0);
+      if (shotCount > 70) {
+        const oldest = effects.findIndex((item) => item.type !== "bomb" && item.type !== "airdrop" && item.type !== "liq");
+        if (oldest >= 0) effects.splice(oldest, 1);
+      }
+      if (effects.length > 110) effects.splice(0, effects.length - 110);
+      if (impacts.length > 40) impacts.splice(0, impacts.length - 40);
     },
     celebrate(side) {
       celebrateSide = side;
       celebrateUntil = performance.now() + 6000;
-      if (reduced) return;
+      if (!reduced) shakeUntil = performance.now() + 700;
       const now = performance.now();
-      for (let i = 0; i < 22; i += 1) {
+      const burst = reduced ? 8 : 36;
+      for (let i = 0; i < burst; i += 1) {
         confetti.push({
           side,
-          born: now + i * 18,
-          life: 1300 + Math.random() * 600,
-          x: side === "buy" ? 0.12 + Math.random() * 0.28 : 0.6 + Math.random() * 0.28,
-          drift: (Math.random() - 0.5) * 0.08,
+          born: now + i * 12,
+          life: 1100 + Math.random() * 700,
+          x: side === "buy" ? 0.28 + Math.random() * 0.4 : 0.32 + Math.random() * 0.4,
+          drift: (Math.random() - 0.5) * 0.16,
         });
       }
     },
     clear() {
       effects.length = 0;
+      impacts.length = 0;
       confetti = [];
+      shakeUntil = 0;
       bids = [];
       asks = [];
       buyShare = 0.5;
@@ -308,25 +340,47 @@ function drawFront(ctx, scene) {
 }
 
 function drawCrowd(ctx, scene) {
-  const { h, now, reduced, w, scale } = scene;
+  const { h, now, reduced, w, scale, front } = scene;
   const ranks = w < 560 ? 3 : 4;
   for (let lane = 0; lane < LANES.length; lane += 1) {
-    const foot = h * LANES[lane];
+    const foot = h * LANES[lane] + ((lane % 2) - 0.5) * 6;
     for (const side of ["buy", "sell"]) {
       for (let rank = 0; rank < ranks; rank += 1) {
         const kind = rank === ranks - 1 ? "melee" : rank === ranks - 2 ? "archer" : "shield";
-        const march = reduced ? 0 : Math.sin(now / 420 + lane + rank) * 4 * scale * (side === "buy" ? 1 : -1);
-        drawPerson(ctx, slotX(scene, side, rank, ranks) + march, foot, {
+        const surge = scene.celebrate === side ? 34 * scale : 0;
+        const lunge = reduced ? 0 : Math.max(0, Math.sin(now / 260 + lane * 1.7 + rank)) * (kind === "melee" ? 16 : 6) * scale;
+        const dir = side === "buy" ? 1 : -1;
+        const x = clashX(scene, side, rank, ranks) + dir * (lunge + surge);
+        const pose = poseFor(scene, side, lane, kind, rank === ranks - 1 ? 2 : rank) || (kind === "melee" && !reduced && Math.sin(now / 260 + lane) > 0.15 ? "aim" : "idle");
+        drawPerson(ctx, x, foot, {
           side,
           kind,
-          scale: scale * (kind === "melee" ? 1.02 : 0.9),
-          phase: now / 160 + lane * 1.4 + rank,
-          pose: poseFor(scene, side, lane, kind, rank === ranks - 1 ? 2 : rank),
+          scale: scale * (kind === "melee" ? 1.05 : 0.88),
+          phase: now / 140 + lane + rank,
+          pose,
           reduced,
         });
       }
     }
   }
+  void front;
+}
+
+function clashX(scene, side, rank, ranks) {
+  const { w, front, scale } = scene;
+  const pad = 10 * scale;
+  if (rank === ranks - 1) {
+    return side === "buy" ? front - pad : front + pad;
+  }
+  const t = rank / Math.max(1, ranks - 1);
+  if (side === "buy") {
+    const a = w * 0.16;
+    const b = front - 18 * scale;
+    return a + (b - a) * (0.15 + t * 0.8);
+  }
+  const b = w * 0.84;
+  const a = front + 18 * scale;
+  return b - (b - a) * (0.15 + t * 0.8);
 }
 
 function drawEffects(ctx, scene) {
@@ -513,20 +567,30 @@ function drawShot(ctx, effect, raw, w, y, front, scale, reduced) {
   const start = buy ? w * 0.22 : w * 0.78;
   const end = buy ? front - 8 : front + 8;
   const x = start + (end - start) * p;
-  const size = effect.tier === "volley" ? 6 : effect.tier === "dust" ? 3 : 4.2;
-  ctx.strokeStyle = buy ? "#d6ff6a" : "#ffb25a";
-  ctx.lineWidth = effect.tier === "volley" ? 4 : 3;
+  const size = effect.tier === "volley" ? 7 : effect.tier === "dust" ? 3.4 : 4.6;
+  ctx.strokeStyle = buy ? "#e8ff6a" : "#ffb15a";
+  ctx.lineWidth = effect.tier === "volley" ? 5 : 3.5;
   ctx.beginPath();
-  ctx.moveTo(x - (buy ? 1 : -1) * 22, y);
+  ctx.moveTo(x - (buy ? 1 : -1) * (effect.tier === "volley" ? 36 : 18), y);
   ctx.lineTo(x, y);
   ctx.stroke();
-  ctx.fillStyle = "#fff6d8";
+  ctx.fillStyle = "#fff8d0";
   ctx.beginPath();
   ctx.arc(x, y, size, 0, Math.PI * 2);
   ctx.fill();
-  if (effect.tier === "volley") {
+  if (p > 0.72) {
+    const hit = (p - 0.72) / 0.28;
+    ctx.globalAlpha *= 1 - hit;
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(x, y, size + 3, 0, Math.PI * 2);
+    ctx.arc(end, y, 6 + hit * (effect.tier === "volley" ? 22 : 12), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(end - 8, y);
+    ctx.lineTo(end + 8, y);
+    ctx.moveTo(end, y - 8);
+    ctx.lineTo(end, y + 8);
     ctx.stroke();
   }
 }
@@ -552,13 +616,21 @@ function drawBomb(ctx, effect, raw, scene, y) {
     return;
   }
   const blast = (p - 0.38) / 0.62;
-  const radius = (12 + blast * 42) * scale;
-  ctx.fillStyle = buy ? `rgba(210, 255, 140, ${0.45 * (1 - blast)})` : `rgba(255, 150, 90, ${0.5 * (1 - blast)})`;
-  ctx.strokeStyle = "#fff4d2";
-  ctx.lineWidth = 3;
+  const radius = (18 + blast * 78) * scale;
+  ctx.fillStyle = `rgba(40, 24, 16, ${0.35 * (1 - blast)})`;
+  ctx.beginPath();
+  ctx.ellipse(boom, y + 10 * scale, radius * 0.85, radius * 0.35, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = buy ? `rgba(230, 255, 120, ${0.55 * (1 - blast)})` : `rgba(255, 120, 40, ${0.62 * (1 - blast)})`;
+  ctx.strokeStyle = "#fff6c8";
+  ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.arc(boom, y, radius, 0, Math.PI * 2);
   ctx.fill();
+  ctx.stroke();
+  ctx.globalAlpha *= 0.8;
+  ctx.beginPath();
+  ctx.arc(boom, y, radius * (0.45 + blast * 0.4), 0, Math.PI * 2);
   ctx.stroke();
   for (let i = 0; i < 8; i += 1) {
     const angle = (Math.PI * 2 * i) / 8;
@@ -649,8 +721,13 @@ function poseFor(scene, side, lane, kind, rank) {
     if (laneOf(effect.lane) !== lane) continue;
     const raw = (scene.now - effect.born) / effect.life;
     if (raw < 0 || raw > 1) continue;
-    if ((effect.type === "bomb" && effect.side !== side && raw > 0.38 && rank === 2) || (effect.type === "liq" && effect.side === side && rank === 2)) {
+    if ((effect.type === "bomb" && effect.side !== side && raw > 0.3 && rank >= 1) || (effect.type === "liq" && effect.side === side && rank >= 1)) {
       return "fall";
+    }
+    for (const hit of scene.impacts || []) {
+      const age = (scene.now - hit.born) / hit.life;
+      if (age < 0 || age > 1) continue;
+      if (hit.side === side && laneOf(hit.lane) === lane && rank === 2) return "fall";
     }
     if (effect.type === "airdrop" && effect.side === side && raw > 0.5) return "cheer";
     if ((effect.type === "shot" || effect.type == null) && effect.side === side && kind !== "shield" && raw < 0.45) return "aim";
