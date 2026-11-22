@@ -1,5 +1,5 @@
-// Original little armies for this page. Round-headed sprout scouts and
-// hooded dust grunts, drawn with canvas shapes. No borrowed sprites.
+// Original fantasy battlefield for this page. Timber camps, banners, and
+// helmeted soldiers are drawn in canvas. No game sprites or official names.
 
 const LANES = [0.4, 0.52, 0.64, 0.76];
 
@@ -140,43 +140,47 @@ export function mountField(canvas) {
 }
 
 function drawBackdrop(ctx, scene) {
-  const { w, h } = scene;
+  const { w, h, front } = scene;
   const sky = ctx.createLinearGradient(0, 0, 0, h);
-  sky.addColorStop(0, "#243044");
-  sky.addColorStop(0.28, "#3c4d46");
-  sky.addColorStop(0.28, "#6a8a52");
-  sky.addColorStop(1, "#2b3a28");
+  sky.addColorStop(0, "#141824");
+  sky.addColorStop(0.22, "#3a2a38");
+  sky.addColorStop(0.34, "#8a4a32");
+  sky.addColorStop(0.34, "#4d5a38");
+  sky.addColorStop(1, "#2a241c");
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = "rgba(255, 244, 210, 0.8)";
-  for (let i = 0; i < 16; i += 1) {
-    const x = ((i * 97) % 100) / 100 * w;
-    const y = ((i * 37) % 22) / 100 * h;
-    ctx.fillRect(x, y, 1.6, 1.6);
+  ctx.fillStyle = "rgba(255, 214, 160, 0.55)";
+  for (let i = 0; i < 18; i += 1) {
+    ctx.fillRect(((i * 97) % 100) / 100 * w, ((i * 41) % 24) / 100 * h, 1.4, 1.4);
   }
-  ctx.fillStyle = "#5f7d48";
+  ctx.fillStyle = "#3d4a34";
   ctx.beginPath();
-  ctx.moveTo(0, h * 0.32);
-  ctx.quadraticCurveTo(w * 0.2, h * 0.24, w * 0.4, h * 0.31);
-  ctx.lineTo(w * 0.4, h * 0.36);
-  ctx.lineTo(0, h * 0.36);
+  ctx.moveTo(0, h * 0.36);
+  ctx.quadraticCurveTo(w * 0.22, h * 0.28, w * 0.48, h * 0.35);
+  ctx.lineTo(w * 0.48, h * 0.4);
+  ctx.lineTo(0, h * 0.4);
   ctx.fill();
-  ctx.fillStyle = "#6d5a48";
+  ctx.fillStyle = "#4a382c";
   ctx.beginPath();
-  ctx.moveTo(w, h * 0.33);
-  ctx.quadraticCurveTo(w * 0.78, h * 0.25, w * 0.58, h * 0.32);
-  ctx.lineTo(w * 0.58, h * 0.37);
-  ctx.lineTo(w, h * 0.37);
+  ctx.moveTo(w, h * 0.37);
+  ctx.quadraticCurveTo(w * 0.74, h * 0.29, w * 0.5, h * 0.36);
+  ctx.lineTo(w * 0.5, h * 0.41);
+  ctx.lineTo(w, h * 0.41);
   ctx.fill();
-  const dirt = ctx.createLinearGradient(0, h * 0.34, 0, h);
-  dirt.addColorStop(0, "#6e8b4e");
-  dirt.addColorStop(1, "#3e4d32");
+  const dirt = ctx.createLinearGradient(0, h * 0.36, 0, h);
+  dirt.addColorStop(0, "#5d6a42");
+  dirt.addColorStop(0.55, "#4a4032");
+  dirt.addColorStop(1, "#2c261f");
   ctx.fillStyle = dirt;
-  ctx.fillRect(0, h * 0.34, w, h);
-  ctx.fillStyle = "rgba(80, 170, 140, 0.16)";
-  ctx.fillRect(0, h * 0.34, scene.front, h);
-  ctx.fillStyle = "rgba(180, 70, 48, 0.12)";
-  ctx.fillRect(scene.front, h * 0.34, w - scene.front, h);
+  ctx.fillRect(0, h * 0.36, w, h);
+  ctx.fillStyle = "rgba(46, 110, 70, 0.28)";
+  ctx.fillRect(0, h * 0.36, front, h);
+  ctx.fillStyle = "rgba(120, 36, 32, 0.22)";
+  ctx.fillRect(front, h * 0.36, w - front, h);
+  ctx.fillStyle = "rgba(20, 14, 10, 0.45)";
+  ctx.beginPath();
+  ctx.ellipse(front, h * 0.72, w * 0.08, h * 0.18, 0, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawDepthWash(ctx, scene, bids, asks) {
@@ -193,14 +197,20 @@ function drawDepthWash(ctx, scene, bids, asks) {
 }
 
 function drawTracks(ctx, scene) {
-  const { w, h } = scene;
-  ctx.strokeStyle = "rgba(255, 236, 190, 0.16)";
-  ctx.lineWidth = 2;
+  const { w, h, front } = scene;
+  ctx.strokeStyle = "rgba(18, 14, 10, 0.55)";
+  ctx.lineWidth = 3;
+  ctx.lineJoin = "round";
   for (const lane of LANES) {
-    const y = h * lane + 8;
+    const y = h * lane + 10;
     ctx.beginPath();
-    ctx.moveTo(w * 0.1, y);
-    ctx.lineTo(w * 0.9, y);
+    ctx.moveTo(w * 0.08, y);
+    for (let i = 1; i <= 8; i += 1) {
+      const x = w * (0.08 + i * 0.1);
+      const jag = i % 2 === 0 ? -5 : 6;
+      if (Math.abs(x - front) < w * 0.04) continue;
+      ctx.lineTo(x, y + jag);
+    }
     ctx.stroke();
   }
 }
@@ -208,49 +218,50 @@ function drawTracks(ctx, scene) {
 function drawFort(ctx, scene, side) {
   const buy = side === "buy";
   const { w, h, scale, now, reduced, celebrate } = scene;
-  const x = buy ? w * 0.08 : w * 0.92;
-  const foot = h * 0.84;
+  const x = buy ? w * 0.09 : w * 0.91;
+  const foot = h * 0.86;
   const s = scale;
   ctx.save();
   ctx.translate(x, foot);
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
   ctx.beginPath();
-  ctx.ellipse(0, 4, 28 * s, 6 * s, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 6, 34 * s, 7 * s, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = buy ? "#246b49" : "#6a4034";
-  roundRect(ctx, -30 * s, -16 * s, 60 * s, 22 * s, 5 * s);
+  ctx.fillStyle = buy ? "#3d5a34" : "#5a3028";
+  roundRect(ctx, -34 * s, -18 * s, 68 * s, 24 * s, 3 * s);
   ctx.fill();
-  ctx.fillStyle = buy ? "#3e9a6c" : "#8d5344";
-  roundRect(ctx, -18 * s, -62 * s, 36 * s, 50 * s, 7 * s);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.4)";
-  ctx.lineWidth = 1.6;
-  ctx.stroke();
-  ctx.fillStyle = buy ? "#f2e2a8" : "#ffd0b4";
-  ctx.fillRect(-8 * s, -42 * s, 7 * s, 8 * s);
-  ctx.fillRect(3 * s, -42 * s, 7 * s, 8 * s);
-  ctx.fillStyle = buy ? "#173628" : "#2a1814";
-  roundRect(ctx, -6 * s, -14 * s, 12 * s, 16 * s, 2 * s);
-  ctx.fill();
-  const wave = reduced ? 0 : Math.sin(now / 500) * 2 * s;
-  const pole = buy ? 20 * s : -20 * s;
-  ctx.strokeStyle = buy ? "#d9f5a8" : "#f0c7b0";
+  ctx.fillStyle = buy ? "#6d5338" : "#6a4034";
+  ctx.fillRect(-22 * s, -58 * s, 10 * s, 44 * s);
+  ctx.fillRect(12 * s, -58 * s, 10 * s, 44 * s);
+  ctx.fillStyle = buy ? "#8a6a42" : "#7a4a3c";
+  ctx.fillRect(-16 * s, -46 * s, 32 * s, 32 * s);
+  ctx.strokeStyle = "rgba(0,0,0,0.45)";
+  ctx.strokeRect(-16 * s, -46 * s, 32 * s, 32 * s);
+  ctx.fillStyle = buy ? "#d7e38a" : "#ffb088";
+  ctx.fillRect(-8 * s, -36 * s, 6 * s, 7 * s);
+  ctx.fillRect(3 * s, -36 * s, 6 * s, 7 * s);
+  ctx.fillStyle = "#1a120e";
+  ctx.fillRect(-5 * s, -16 * s, 10 * s, 16 * s);
+  const wave = reduced ? 0 : Math.sin(now / 480) * 2 * s;
+  const pole = buy ? -28 * s : 28 * s;
+  ctx.strokeStyle = "#e6d2a8";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(pole, -62 * s);
-  ctx.lineTo(pole, -84 * s);
+  ctx.moveTo(pole, -18 * s);
+  ctx.lineTo(pole, -78 * s);
   ctx.stroke();
-  ctx.fillStyle = buy ? "#9be27a" : "#e25b45";
+  ctx.fillStyle = buy ? "#2f8f4e" : "#c44732";
   ctx.beginPath();
-  ctx.moveTo(pole, -84 * s + wave);
-  ctx.lineTo(pole + (buy ? 16 : -16) * s, -78 * s);
-  ctx.lineTo(pole, -72 * s);
+  ctx.moveTo(pole, -78 * s + wave);
+  ctx.lineTo(pole + (buy ? 18 : -18) * s, -70 * s);
+  ctx.lineTo(pole + (buy ? 14 : -14) * s, -64 * s);
+  ctx.lineTo(pole, -66 * s);
   ctx.fill();
   ctx.restore();
-  drawPerson(ctx, x, foot - 64 * s, {
+  drawPerson(ctx, x, foot - 50 * s, {
     side,
-    kind: "scout",
-    scale: s * 0.62,
+    kind: "melee",
+    scale: s * 0.7,
     phase: now / 280,
     pose: celebrate === side ? "cheer" : "idle",
     reduced,
@@ -258,36 +269,58 @@ function drawFort(ctx, scene, side) {
 }
 
 function drawFront(ctx, scene) {
-  const { h, front, now, reduced } = scene;
-  const glow = reduced ? 0.9 : 0.65 + Math.sin(now / 400) * 0.25;
-  ctx.strokeStyle = `rgba(255, 228, 170, ${glow})`;
-  ctx.lineWidth = 3;
+  const { h, w, front, now, reduced } = scene;
+  ctx.strokeStyle = "rgba(90, 70, 48, 0.9)";
+  ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.moveTo(front, h * 0.36);
-  ctx.lineTo(front, h * 0.9);
+  let y = h * 0.38;
+  ctx.moveTo(front - 6, y);
+  while (y < h * 0.9) {
+    y += 16;
+    ctx.lineTo(front + (Math.floor(y / 16) % 2 ? 8 : -8), y);
+  }
   ctx.stroke();
-  ctx.fillStyle = "#f4e2b0";
+  ctx.strokeStyle = "#cbb892";
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 5; i += 1) {
+    const sy = h * (0.42 + i * 0.09);
+    ctx.beginPath();
+    ctx.moveTo(front - 10, sy);
+    ctx.lineTo(front + 4, sy - 12);
+    ctx.moveTo(front + 10, sy);
+    ctx.lineTo(front - 4, sy - 12);
+    ctx.stroke();
+  }
+  const drift = reduced ? 0 : Math.sin(now / 700) * 6;
+  for (let i = 0; i < 4; i += 1) {
+    ctx.fillStyle = `rgba(70, 64, 60, ${0.28 + i * 0.05})`;
+    ctx.beginPath();
+    ctx.ellipse(front + drift * (i % 2 ? 1 : -1), h * (0.34 + i * 0.04), 18 + i * 8, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = "#d7c49a";
   ctx.beginPath();
   ctx.moveTo(front, h * 0.36);
-  ctx.lineTo(front + 14, h * 0.36 + 8);
-  ctx.lineTo(front, h * 0.36 + 16);
+  ctx.lineTo(front + 16, h * 0.4);
+  ctx.lineTo(front, h * 0.44);
   ctx.fill();
+  void w;
 }
 
 function drawCrowd(ctx, scene) {
   const { h, now, reduced, w, scale } = scene;
-  const ranks = w < 640 ? 2 : 3;
+  const ranks = w < 560 ? 3 : 4;
   for (let lane = 0; lane < LANES.length; lane += 1) {
     const foot = h * LANES[lane];
     for (const side of ["buy", "sell"]) {
       for (let rank = 0; rank < ranks; rank += 1) {
-        const kind = rank === ranks - 1 ? "archer" : "scout";
-        const march = reduced ? 0 : Math.sin(now / 520 + lane + rank) * 5 * scale * (side === "buy" ? 1 : -1);
+        const kind = rank === ranks - 1 ? "melee" : rank === ranks - 2 ? "archer" : "shield";
+        const march = reduced ? 0 : Math.sin(now / 420 + lane + rank) * 4 * scale * (side === "buy" ? 1 : -1);
         drawPerson(ctx, slotX(scene, side, rank, ranks) + march, foot, {
           side,
           kind,
-          scale: scale * (kind === "archer" ? 1.08 : 0.96),
-          phase: now / 180 + lane * 1.3 + rank,
+          scale: scale * (kind === "melee" ? 1.02 : 0.9),
+          phase: now / 160 + lane * 1.4 + rank,
           pose: poseFor(scene, side, lane, kind, rank === ranks - 1 ? 2 : rank),
           reduced,
         });
@@ -338,20 +371,20 @@ function drawCaptions(ctx, w) {
   ctx.font = '700 13px "WenQuanYi Micro Hei", "PingFang SC", "Microsoft YaHei", sans-serif';
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(0,0,0,0.45)";
-  ctx.fillText("蓝军 · 芽兵", 13, 22);
-  ctx.fillText("苔堡", 13, 40);
-  ctx.fillStyle = "#f3fff6";
-  ctx.fillText("蓝军 · 芽兵", 12, 21);
-  ctx.fillStyle = "#d9ffb0";
-  ctx.fillText("苔堡", 12, 39);
+  ctx.fillText("多军", 13, 22);
+  ctx.fillText("多军营地", 13, 40);
+  ctx.fillStyle = "#e7ffd2";
+  ctx.fillText("多军", 12, 21);
+  ctx.fillStyle = "#b6e38a";
+  ctx.fillText("多军营地", 12, 39);
   ctx.textAlign = "right";
   ctx.fillStyle = "rgba(0,0,0,0.45)";
-  ctx.fillText("红军 · 尘卒", w - 11, 22);
-  ctx.fillText("骨寨", w - 11, 40);
-  ctx.fillStyle = "#fff4ee";
-  ctx.fillText("红军 · 尘卒", w - 12, 21);
-  ctx.fillStyle = "#ffc7b4";
-  ctx.fillText("骨寨", w - 12, 39);
+  ctx.fillText("空军", w - 11, 22);
+  ctx.fillText("空军营地", w - 11, 40);
+  ctx.fillStyle = "#ffe4d8";
+  ctx.fillText("空军", w - 12, 21);
+  ctx.fillStyle = "#ffb199";
+  ctx.fillText("空军营地", w - 12, 39);
   ctx.textAlign = "left";
 }
 
@@ -381,31 +414,29 @@ function drawPerson(ctx, x, footY, options) {
   ctx.lineTo(2.2 * s - step * 5 * s, 0);
   ctx.stroke();
 
-  ctx.fillStyle = buy ? (options.kind === "archer" ? "#7ddea0" : "#1fa978") : options.kind === "archer" ? "#ff8a6a" : "#d24b38";
-  roundRect(ctx, -6 * s, -22 * s, 12 * s, 14 * s, 4 * s);
+  ctx.fillStyle = buy ? "#1d4a30" : "#6a241e";
+  ctx.beginPath();
+  ctx.moveTo(-8 * s, -18 * s);
+  ctx.lineTo(8 * s, -18 * s);
+  ctx.lineTo(5 * s, -4 * s);
+  ctx.lineTo(-5 * s, -4 * s);
   ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.4)";
+  ctx.fillStyle = buy ? "#2f7a45" : "#b13a2e";
+  roundRect(ctx, -6 * s, -22 * s, 12 * s, 14 * s, 3 * s);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.45)";
   ctx.lineWidth = 1.2;
   ctx.stroke();
 
-  ctx.fillStyle = buy ? "#f6d7b0" : "#f4e6d6";
+  ctx.fillStyle = buy ? "#234e32" : "#4e1c22";
   ctx.beginPath();
-  ctx.arc(0, -28 * s, 6 * s, 0, Math.PI * 2);
+  ctx.arc(0, -31 * s, 6.6 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#e7c8a4";
+  ctx.beginPath();
+  ctx.arc(0, -27.5 * s, 5 * s, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  if (!buy) {
-    ctx.strokeStyle = "#7a3028";
-    ctx.lineWidth = 2.4 * s;
-    ctx.beginPath();
-    ctx.arc(0, -29 * s, 6.4 * s, Math.PI * 1.08, Math.PI * 1.92);
-    ctx.stroke();
-  } else {
-    ctx.fillStyle = "#8ed45a";
-    ctx.beginPath();
-    ctx.ellipse(-2.4 * s, -34 * s, 4 * s, 2 * s, -0.7, 0, Math.PI * 2);
-    ctx.ellipse(2.6 * s, -34.2 * s, 4.2 * s, 2.1 * s, 0.6, 0, Math.PI * 2);
-    ctx.fill();
-  }
 
   ctx.fillStyle = "#1a120e";
   if (pose === "fall") {
@@ -446,20 +477,32 @@ function drawPerson(ctx, x, footY, options) {
   }
   ctx.stroke();
 
-  if (options.kind === "archer" && pose !== "fall") {
-    ctx.strokeStyle = buy ? "#e4ffb0" : "#ffe1c8";
-    ctx.lineWidth = 1.6 * s;
+  if (pose !== "fall" && options.kind === "shield") {
+    ctx.fillStyle = buy ? "#7dbe62" : "#e07a62";
+    ctx.strokeStyle = "#1a120e";
     ctx.beginPath();
-    const bx = face * 11 * s;
-    ctx.arc(bx, -16 * s, 6 * s, face === 1 ? -1.15 : Math.PI - 1.15, face === 1 ? 1.15 : Math.PI + 1.15);
+    ctx.moveTo(face * 8 * s, -22 * s);
+    ctx.lineTo(face * 14 * s, -16 * s);
+    ctx.lineTo(face * 8 * s, -8 * s);
+    ctx.closePath();
+    ctx.fill();
     ctx.stroke();
-  } else if (pose === "aim") {
-    ctx.strokeStyle = buy ? "#d9f29a" : "#f0d8c4";
-    ctx.lineWidth = 1.8 * s;
+  }
+  if (pose !== "fall" && options.kind !== "shield") {
+    ctx.strokeStyle = "#2a2118";
+    ctx.lineWidth = 2.2 * s;
     ctx.beginPath();
-    ctx.moveTo(face * 8 * s, -16 * s);
-    ctx.lineTo(face * 15 * s, -20 * s);
+    ctx.moveTo(face * 2 * s, -16 * s);
+    ctx.lineTo(face * (pose === "aim" ? 18 : 12) * s, -18 * s);
     ctx.stroke();
+    if (options.kind === "archer") {
+      ctx.strokeStyle = buy ? "#d7ec9a" : "#ffd0b8";
+      ctx.lineWidth = 1.5 * s;
+      ctx.beginPath();
+      const bx = face * 12 * s;
+      ctx.arc(bx, -16 * s, 5.5 * s, face === 1 ? -1.2 : Math.PI - 1.2, face === 1 ? 1.2 : Math.PI + 1.2);
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }
@@ -470,17 +513,17 @@ function drawShot(ctx, effect, raw, w, y, front, scale, reduced) {
   const start = buy ? w * 0.22 : w * 0.78;
   const end = buy ? front - 8 : front + 8;
   const x = start + (end - start) * p;
-  const size = effect.tier === "volley" ? 7 : effect.tier === "dust" ? 3.2 : 4.5;
-  ctx.fillStyle = buy ? "#f4ffcf" : "#ffe7d4";
+  const size = effect.tier === "volley" ? 6 : effect.tier === "dust" ? 3 : 4.2;
+  ctx.strokeStyle = buy ? "#d6ff6a" : "#ffb25a";
+  ctx.lineWidth = effect.tier === "volley" ? 4 : 3;
+  ctx.beginPath();
+  ctx.moveTo(x - (buy ? 1 : -1) * 22, y);
+  ctx.lineTo(x, y);
+  ctx.stroke();
+  ctx.fillStyle = "#fff6d8";
   ctx.beginPath();
   ctx.arc(x, y, size, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = buy ? "#8ee07a" : "#e07a58";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x - (buy ? 1 : -1) * (10 + size), y + 1);
-  ctx.stroke();
   if (effect.tier === "volley") {
     ctx.beginPath();
     ctx.arc(x, y, size + 3, 0, Math.PI * 2);
@@ -610,8 +653,8 @@ function poseFor(scene, side, lane, kind, rank) {
       return "fall";
     }
     if (effect.type === "airdrop" && effect.side === side && raw > 0.5) return "cheer";
-    if ((effect.type === "shot" || effect.type == null) && effect.side === side && kind === "archer" && raw < 0.45) return "aim";
-    if (effect.type === "bomb" && effect.side === side && kind === "archer" && raw < 0.38) return "aim";
+    if ((effect.type === "shot" || effect.type == null) && effect.side === side && kind !== "shield" && raw < 0.45) return "aim";
+    if (effect.type === "bomb" && effect.side === side && kind !== "shield" && raw < 0.38) return "aim";
   }
   return "idle";
 }

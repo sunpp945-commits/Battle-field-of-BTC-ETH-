@@ -318,7 +318,7 @@ export function visualsForPrint(input, rules = RULES) {
 }
 
 export function eventTitle(event) {
-  const army = event.side === "buy" ? "蓝军" : "红军";
+  const army = event.side === "buy" ? "多军" : "空军";
   if (event.type === "victory") return `${army}大获全胜`;
   if (event.type === "liq") return event.side === "buy" ? "多头强平" : "空头强平";
   if (event.type === "bomb") {
@@ -327,13 +327,13 @@ export function eventTitle(event) {
   if (event.type === "airdrop") {
     return event.reason === "surge" ? `${army}空投支援 · 下风增援` : `${army}空投支援`;
   }
-  if (event.tier === "volley") return event.side === "buy" ? "蓝军藤弩" : "红军裂弓";
-  return event.side === "buy" ? "蓝军芽兵" : "红军尘卒";
+  if (event.tier === "volley") return `${army}齐射`;
+  return `${army}射击`;
 }
 
 export function barCaption(rules = RULES) {
   const seconds = Math.round(rules.windowMs / 1000);
-  return `蓝军/红军占优条是近 ${seconds} 秒主动买入对主动卖出的名义金额，由本页计算，不是币安官方指标。`;
+  return `多军/空军占优条是近 ${seconds} 秒主动买入对主动卖出的名义金额，由本页计算，不是币安官方指标。`;
 }
 
 export function legendLines(rules = RULES) {
@@ -346,7 +346,7 @@ export function legendLines(rules = RULES) {
   return [
     {
       title: "两边各是谁",
-      text: "左侧蓝军是芽兵和藤弩手，守在苔堡前，代表主动买入。右侧红军是尘卒和裂弓手，守在骨寨前，代表主动卖出。",
+      text: "左侧绿色多军是主动买入（做多）。右侧红色空军是主动卖出（做空）。两边各有营地，中间是被撕开的战线。",
     },
     {
       title: "量能",
@@ -366,7 +366,7 @@ export function legendLines(rules = RULES) {
     },
     {
       title: "占优计时",
-      text: `近 ${win} 秒占比至少 ${share}%，且两边合计至少 ${minTotal} 美元，才算占优。页面显示「蓝军占优 N 秒」或「红军占优 N 秒」。`,
+      text: `近 ${win} 秒占比至少 ${share}%，且两边合计至少 ${minTotal} 美元，才算占优。页面显示「多军占优 N 秒」或「空军占优 N 秒」。`,
     },
     {
       title: "大获全胜",
@@ -391,7 +391,7 @@ export function streakCopy(state, rules = RULES) {
     };
   }
   const sec = Math.max(0, Math.floor(state.elapsedMs / 1000));
-  const name = state.leader === "buy" ? "蓝军" : "红军";
+  const name = state.leader === "buy" ? "多军" : "空军";
   const won = state.lockedSide === state.leader;
   return {
     title: `${name}占优 ${sec} 秒`,

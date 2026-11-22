@@ -363,8 +363,8 @@ function paintEnergy(state) {
   const sellPct = has ? state.sell * 100 : 50;
   els.barBuy.style.width = `${buyPct}%`;
   els.barSell.style.width = `${sellPct}%`;
-  els.barBuy.textContent = buyPct >= 16 ? `蓝军 ${buyPct.toFixed(0)}%` : "";
-  els.barSell.textContent = sellPct >= 16 ? `红军 ${sellPct.toFixed(0)}%` : "";
+  els.barBuy.textContent = buyPct >= 16 ? `多军 ${buyPct.toFixed(0)}%` : "";
+  els.barSell.textContent = sellPct >= 16 ? `空军 ${sellPct.toFixed(0)}%` : "";
   const copy = streakCopy(state);
   if (copy.title !== shownStreak) {
     shownStreak = copy.title;
@@ -375,7 +375,7 @@ function paintEnergy(state) {
   els.meter.setAttribute("aria-valuenow", String(Math.min(20, copy.sec)));
   els.meter.setAttribute("aria-valuetext", copy.title);
   els.sums.textContent = has
-    ? `蓝军 ${formatCompactUsd(state.buyUsd)} · 红军 ${formatCompactUsd(state.sellUsd)} · 近 60 秒`
+    ? `多军 ${formatCompactUsd(state.buyUsd)} · 空军 ${formatCompactUsd(state.sellUsd)} · 近 60 秒`
     : "还没有计入的主动成交";
   els.energy.classList.toggle("is-buy", state.leader === "buy");
   els.energy.classList.toggle("is-sell", state.leader === "sell");
@@ -428,14 +428,14 @@ function paintBook(bids, asks) {
     els.book.textContent = "盘口还没有到";
     return;
   }
-  els.book.textContent = `根垒 ${formatCompactUsd(bid)} · 骨垒 ${formatCompactUsd(ask)} · 可见盘口，不计入胜负`;
+  els.book.textContent = `买盘 ${formatCompactUsd(bid)} · 卖盘 ${formatCompactUsd(ask)} · 可见盘口，不计入胜负`;
 }
 
 function showVictory(side) {
   const buy = side === "buy";
   els.victory.hidden = false;
   els.victory.className = buy ? "victory is-buy" : "victory is-sell";
-  els.victoryKicker.textContent = buy ? "蓝军 · 芽兵" : "红军 · 尘卒";
+  els.victoryKicker.textContent = buy ? "多军" : "空军";
   els.victorySub.textContent = `连续占优 ${RULES.victoryHoldMs / 1000} 秒`;
   field.celebrate(side);
   clearTimeout(bannerTimer);

@@ -35,7 +35,7 @@
       <p id="status-detail" class="status-detail">正在连接 fstream.binance.com 的 /market 与 /public 线路。</p>
     </header>
 
-    <p class="mapping">左侧芽兵、蓝军是主动买入。右侧尘卒、红军是主动卖出。这条战线没有声音。</p>
+    <p class="mapping">左侧绿色多军是主动买入。右侧红色空军是主动卖出。这条战线没有声音。</p>
 
     <section class="metrics" aria-label="行情">
       <article class="card">
@@ -79,8 +79,8 @@
         <div id="hold-fill"></div>
       </div>
       <div class="bar" aria-hidden="true">
-        <span id="bar-buy" class="bar-buy" style="width:50%">蓝军 50%</span>
-        <span id="bar-sell" class="bar-sell" style="width:50%">红军 50%</span>
+        <span id="bar-buy" class="bar-buy" style="width:50%">多军 50%</span>
+        <span id="bar-sell" class="bar-sell" style="width:50%">空军 50%</span>
       </div>
       <p id="energy-sums" class="note">还没有计入的主动成交</p>
       <p id="energy-note" class="note"></p>
@@ -88,7 +88,7 @@
     </section>
 
     <section id="field" class="field" aria-label="战线">
-      <canvas id="battle" width="800" height="480">左侧芽兵代表主动买入，右侧尘卒代表主动卖出。</canvas>
+      <canvas id="battle" width="800" height="480">左侧多军代表主动买入，右侧空军代表主动卖出。</canvas>
       <div id="victory" class="victory" hidden role="status">
         <p id="victory-kicker" class="victory-kicker"></p>
         <p class="victory-title">大获全胜</p>
@@ -113,7 +113,7 @@
     </div>
 
     <footer class="foot">
-      <p>价格是币安 USDⓈ-M 永续合约，不是现货。蓝军/红军占优、炸弹、空投支援和大获全胜都由本页按公开成交的主动买卖名义金额计算，不是币安官方指标。</p>
+      <p>价格是币安 USDⓈ-M 永续合约，不是现货。多军/空军占优、炸弹、空投支援和大获全胜都由本页按公开成交的主动买卖名义金额计算，不是币安官方指标。</p>
       <p>全网账户多空比和 5 分钟主动买卖量比另行列出，那两项来自币安公开接口。强平来自 forceOrder。盘口只显示可见深度。</p>
       <p>数据由你的浏览器直接向币安请求。没有账号，没有声音，没有代理。</p>
     </footer>

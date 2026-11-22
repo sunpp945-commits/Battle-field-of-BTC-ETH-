@@ -252,7 +252,7 @@ test("victory needs 20 continuous seconds and does not repeat until the lead dro
   assert.equal(won.events[0].side, "buy");
   assert.equal(battle.tick(21_000).events.some((event) => event.type === "victory"), false);
   assert.equal(battle.tick(40_000).events.some((event) => event.type === "victory"), false);
-  assert.equal(streakCopy(battle.snapshot(8_000)).title, "蓝军占优 8 秒");
+  assert.equal(streakCopy(battle.snapshot(8_000)).title, "多军占优 8 秒");
 
   const dropped = battle.push(21_000, "sell", 400_000);
   assert.equal(dropped.state.leader, null);
